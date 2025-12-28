@@ -8,10 +8,10 @@ import sys
 class Config:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    TRAIN_PATH = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\ViOCD\\train.json"
-    DEV_PATH   = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\ViOCD\\dev.json"
-    TEST_PATH  = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\ViOCD\\test.json"
-    SAVE_PATH  = "transformer_base.pth"
+    TRAIN_PATH = "/kaggle/working/23520728_Lab5_DeepLearning/ViOCD/train.json"
+    DEV_PATH   = "/kaggle/working/23520728_Lab5_DeepLearning/ViOCD/dev.json"
+    TEST_PATH  = "/kaggle/working/23520728_Lab5_DeepLearning/ViOCD/test.json"
+    SAVE_PATH  = "/kaggle/working/transformer_base.pth"
     MIN_FREQ   = 1
 
     D_MODEL = 512       
@@ -191,4 +191,5 @@ def main():
         print(report)
 
 if __name__ == "__main__":
+
     main()
