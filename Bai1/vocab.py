@@ -2,6 +2,7 @@ import json
 import re
 import os
 import torch
+import numpy as np
 from typing import List, Dict, Tuple
 
 class Vocabulary:
@@ -14,7 +15,8 @@ class Vocabulary:
         data_iter = raw if isinstance(raw, list) else raw.values()
 
         word_freq: Dict[str, int] = {}
-        label_set = set()
+        
+        self.label_freq: Dict[str, int] = {} 
         
         for item in data_iter:
             if "review" not in item or "domain" not in item:
@@ -24,7 +26,8 @@ class Vocabulary:
             for w in sent.split():
                 word_freq[w] = word_freq.get(w, 0) + 1
             
-            label_set.add(str(item["domain"]))
+            label = str(item["domain"])
+            self.label_freq[label] = self.label_freq.get(label, 0) + 1
         
         self.pad_token = "<pad>"
         self.bos_token = "<bos>"
@@ -42,7 +45,8 @@ class Vocabulary:
         self.word2idx: Dict[str, int] = {w: i for i, w in enumerate(vocab_words)}
         self.idx2word: Dict[int, str] = {i: w for w, i in self.word2idx.items()}
 
-        sorted_labels = sorted(label_set)
+        # Sắp xếp label để đảm bảo thứ tự index cố định
+        sorted_labels = sorted(self.label_freq.keys())
         self.label2idx: Dict[str, int] = {l: i for i, l in enumerate(sorted_labels)}
         self.idx2label: Dict[int, str] = {i: l for l, i in self.label2idx.items()}
 
@@ -59,8 +63,29 @@ class Vocabulary:
     def num_labels(self) -> int:
         return len(self.label2idx)
 
+    def get_class_weights(self, device=None) -> torch.Tensor:
+        """
+        Tính trọng số cho từng class dựa trên tần suất xuất hiện.
+        Class ít xuất hiện sẽ có trọng số cao hơn.
+        Công thức: Weight = Total_Samples / (Num_Classes * Class_Count)
+        """
+        counts = [self.label_freq[self.idx2label[i]] for i in range(self.num_labels)]
+        counts = np.array(counts)
+        
+        total_samples = sum(counts)
+        n_classes = len(counts)
+        
+        weights = total_samples / (n_classes * counts)
+        
+        weights_tensor = torch.tensor(weights, dtype=torch.float)
+        
+        if device:
+            weights_tensor = weights_tensor.to(device)
+            
+        return weights_tensor
+
     def _preprocess_sentence(self, sentence: str) -> str:
-        if not isinstance(sentence, str): return "" # Phòng hờ data null
+        if not isinstance(sentence, str): return ""
         s = sentence.lower()
         s = re.sub(r"https?://\S+|www\.\S+", " ", s)
         s = re.sub(r"[^0-9a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]", " ", s)
@@ -79,9 +104,7 @@ class Vocabulary:
         tokens = sent.split()
         ids = self.tokens_to_ids(tokens)
         if add_bos_eos:
-            bos = self.word2idx[self.bos_token]
-            eos = self.word2idx[self.eos_token]
-            ids = [bos] + ids + [eos]
+            ids = [self.bos_idx] + ids + [self.eos_idx]
         return ids
 
     def decode_ids(self, ids: List[int], remove_special: bool = True) -> str:
@@ -98,9 +121,8 @@ class Vocabulary:
         if len(lengths) == 0: return torch.empty(0), torch.empty(0)
 
         max_len = lengths.max().item()
-        pad_id = self.word2idx[self.pad_token]
-
-        padded = torch.full((len(seqs), max_len), pad_id, dtype=torch.long)
+        
+        padded = torch.full((len(seqs), max_len), self.pad_idx, dtype=torch.long)
         for i, seq in enumerate(seqs):
             padded[i, : len(seq)] = torch.tensor(seq, dtype=torch.long)
         return padded, lengths
