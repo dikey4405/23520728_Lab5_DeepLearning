@@ -25,13 +25,13 @@ class ScaledDotProductAttention(nn.Module):
         k = self.fc_k(keys).view(b_s, nk, self.head, self.d_kv).permute(0, 2, 3, 1)    # b_s, head, d_kv, nk
         v = self.fc_v(values).view(b_s, nk, self.head, self.d_kv).permute(0, 2, 1, 3)  # b_s, head, nk, d_kv
 
-        att = torch.matmul(q, k) / math.sqrt(self.d_kv)  # b_s, head, nq, nk
-        if attention_mask.dim() == 2:  # [B, T]
-            attention_mask = attention_mask.unsqueeze(1).unsqueeze(1)  # [B,1,1,T]
-            att = att.masked_fill(attention_mask, float("-inf"))
-        att = torch.softmax(att, dim=-1)
-        output = torch.matmul(att, v).permute(0, 2, 1, 3).reshape(b_s, -1, self.d_model)  # b_s, nq, head*d_v
+        att = torch.matmul(q, k) / math.sqrt(self.d_kv)
+        
+        if attention_mask is not None:
+            att = att.masked_fill(attention_mask, -1e4)
 
+        att = torch.softmax(att, dim=-1)
+        output = torch.matmul(att, v).permute(0, 2, 1, 3).reshape(b_s, nq, -1)
         return output
     
 class PositionnalEncoding(nn.Module):
@@ -118,22 +118,24 @@ class TransformerDecoderLayer(nn.Module):
         self.dropout3 = nn.Dropout(dropout)
 
     def forward(self, tgt: torch.Tensor, enc_states: torch.Tensor, enc_attention_mask: torch.Tensor, dec_attention_mask: torch.Tensor):
-        # Masked self-attention
-        features = self.self_attn(tgt, tgt, tgt, attention_mask=dec_attention_mask)
-        features = features + self.dropout1(tgt)
-        features = self.norm1(features)
+        residual = tgt
+        out = self.self_attn(tgt, tgt, tgt, attention_mask=dec_attention_mask)
+        out = self.dropout1(out) # Dropout áp dụng lên output của attention
+        tgt = self.norm1(residual + out) # Cộng với residual
 
-        # Encoder-decoder attention
-        enc_features = self.enc_dec_attn(features, enc_states, enc_states, attention_mask=enc_attention_mask)
-        features = enc_features + self.dropout2(features)
-        features = self.norm2(features)
+        # 2. Cross Attention
+        residual = tgt
+        out = self.enc_dec_attn(tgt, enc_states, enc_states, attention_mask=enc_attention_mask)
+        out = self.dropout2(out)
+        tgt = self.norm2(residual + out)
 
-        # Feed Forward
-        ffn_out = self.ffn(features)
-        features = ffn_out + self.dropout3(features)
-        features = self.norm3(features)
+        # 3. FFN
+        residual = tgt
+        out = self.ffn(tgt)
+        out = self.dropout3(out)
+        tgt = self.norm3(residual + out)
 
-        return features
+        return tgt
 
 class TransformerDecoder(nn.Module):
     def __init__(self, d_model: int, head: int, n_layers: int, d_ff: int, dropout: float):
@@ -158,4 +160,5 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     attn_shape = (seq_len, seq_len)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).bool()
     return subsequent_mask.unsqueeze(0).unsqueeze(0)
+
 
