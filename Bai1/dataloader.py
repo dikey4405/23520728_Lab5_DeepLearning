@@ -2,9 +2,19 @@ import json
 import torch
 import torch.nn.functional as F
 from torch.utils.data import Dataset
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ViOCD_Dataset(Dataset):
-    def __init__(self, data_path: str, vocab):
+    def __init__(self, data_path: str, vocab, min_len: int = 3):
+        """
+        Args:
+            data_path: Đường dẫn file json
+            vocab: Object Vocabulary
+            min_len: Độ dài tối thiểu của câu (tính bằng số từ). 
+                     Các câu ngắn hơn sẽ bị loại bỏ để giảm nhiễu.
+        """
         super().__init__()
         self.vocab = vocab
         
@@ -14,12 +24,25 @@ class ViOCD_Dataset(Dataset):
         items = raw if isinstance(raw, list) else raw.values()
         
         self.data = []
+        skipped_count = 0
+        
         for item in items:
-            if "review" in item and "domain" in item:   
+            if "review" in item and "domain" in item:
+                review_text = item["review"]
+                domain_label = str(item["domain"])
+                
+                processed_text = self.vocab._preprocess_sentence(review_text)
+                if len(processed_text.split()) < min_len:
+                    skipped_count += 1
+                    continue
+                # -----------------------------
+
                 self.data.append({
-                    "review": item["review"],
-                    "domain": str(item["domain"])
+                    "review": review_text,
+                    "domain": domain_label
                 })
+        
+        logger.info(f"Loaded {len(self.data)} samples from {data_path}. Skipped {skipped_count} short/empty samples.")
 
     def __len__(self):
         return len(self.data)
@@ -40,8 +63,9 @@ class ViOCD_Dataset(Dataset):
 
 def collate_fn(items: list) -> dict:
     """
-    Hàm gom batch độc lập.
-    items: List các dict trả về từ __getitem__
+    Hàm gom batch.
+    LƯU Ý: vocab.pad_idx mặc định là 0 trong vocab.py của bạn.
+    Nếu bạn thay đổi thứ tự token trong vocab, hãy cập nhật value=... ở đây.
     """
     input_ids = [item["input_ids"] for item in items]
     
