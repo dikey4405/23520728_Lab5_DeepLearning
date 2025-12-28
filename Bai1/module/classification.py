@@ -18,7 +18,7 @@ class TransformerModel(nn.Module):
 
         self.ln_head = nn.Linear(d_model, vocab.num_labels)
         self.dropout = nn.Dropout(dropout)
-        
+
         class_weights = vocab.get_class_weights() 
         self.loss_fn = nn.CrossEntropyLoss(
             weight=class_weights, 
@@ -38,15 +38,17 @@ class TransformerModel(nn.Module):
 
         input_embs = self.embedding(input_ids) * math.sqrt(self.d_model)
         features = self.PE(input_embs)
-
+        
         features = self.encoder(features, attention_mask)
 
+        mask_bool = (input_ids != self.pad_idx).unsqueeze(-1).float()
+        
         masked_features = features * mask_bool
-
+        
         sum_features = torch.sum(masked_features, dim=1) 
 
         count_tokens = torch.sum(mask_bool, dim=1).clamp(min=1e-9)
-
+        
         pooled_features = sum_features / count_tokens
 
         logits = self.dropout(self.ln_head(pooled_features))
