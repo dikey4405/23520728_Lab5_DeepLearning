@@ -36,7 +36,7 @@ class Vocabulary:
         self.unk_token = "<unk>"
 
         sorted_words = sorted(
-            [item for item in word_freq.items() if item[1] >= min_freq], 
+            [item for item in word_freq.items() if item[1] >= 0], 
             key=lambda x: (-x[1], x[0])
         )
         
@@ -134,4 +134,5 @@ class Vocabulary:
 
     def decode_labels(self, label_ids: List[int]) -> List[str]:
         return [self.idx2label[i] for i in label_ids]
+
 
