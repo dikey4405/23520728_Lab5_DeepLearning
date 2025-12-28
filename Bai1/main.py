@@ -22,9 +22,9 @@ class Config:
 
     D_MODEL = 256       
     N_HEAD = 4         
-    N_LAYERS = 3        
+    N_LAYERS = 2        
     D_FF = 1024         
-    DROPOUT = 0.3      
+    DROPOUT = 0.2      
 
     BATCH_SIZE = 64   
     EPOCHS = 30
@@ -222,6 +222,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
