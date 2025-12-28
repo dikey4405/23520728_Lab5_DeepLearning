@@ -1,9 +1,15 @@
 import torch
+from torch import nn, optim
 from torch.utils.data import DataLoader
-from torch import optim
 import logging
 import os
-import sys
+import math
+from tqdm import tqdm
+from sklearn.metrics import f1_score, classification_report, accuracy_score
+
+from dataloader import ViOCD_Dataset, collate_fn
+from vocab import Vocabulary
+from module.classification import TransformerModel
 
 class Config:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -17,25 +23,17 @@ class Config:
     D_MODEL = 512       
     N_HEAD = 8         
     N_LAYERS = 6        
-    D_FF = 2048        
-    DROPOUT = 0.1    
+    D_FF = 2048         
+    DROPOUT = 0.1      
 
-    BATCH_SIZE = 32     
+    BATCH_SIZE = 32   
     EPOCHS = 20
-
-    LEARNING_RATE = 0.0001 
+    
     ADAM_BETAS = (0.9, 0.98) 
     ADAM_EPS = 1e-9          
+    WARMUP_STEPS = 4000     
 
-# Khởi tạo config
 config = Config()
-
-# --- CÁC IMPORT SAU KHI CÓ CONFIG ---
-from dataloader import ViOCD_Dataset, collate_fn
-from vocab import Vocabulary
-from module.classification import TransformerModel
-from tqdm import tqdm
-from sklearn.metrics import f1_score, classification_report, accuracy_score
 
 logging.basicConfig(
     level=logging.INFO, 
@@ -44,7 +42,38 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-def train(model, dataloader, optimizer, epoch):
+class NoamOpt:
+    "Optim wrapper that implements rate."
+    def __init__(self, model_size, factor, warmup, optimizer):
+        self.optimizer = optimizer
+        self._step = 0
+        self.warmup = warmup
+        self.factor = factor
+        self.model_size = model_size
+        self._rate = 0
+        
+    def step(self):
+        "Update parameters and rate"
+        self._step += 1
+        rate = self.rate()
+        for p in self.optimizer.param_groups:
+            p['lr'] = rate
+        self._rate = rate
+        self.optimizer.step()
+        
+    def rate(self, step = None):
+        "Implement `lrate` above"
+        if step is None:
+            step = self._step
+        return self.factor * \
+            (self.model_size ** (-0.5) * \
+            min(step ** (-0.5), step * self.warmup ** (-1.5)))
+
+    def zero_grad(self):
+        self.optimizer.zero_grad()
+
+# --- 3. TRAINING LOOP ---
+def train(model, dataloader, optimizer_wrapper, epoch):
     model.train()
     total_loss = 0.0
 
@@ -53,14 +82,16 @@ def train(model, dataloader, optimizer, epoch):
         input_ids = batch["input_ids"].to(config.DEVICE)
         label_ids = batch["label_ids"].to(config.DEVICE)
 
-        optimizer.zero_grad()
+        optimizer_wrapper.zero_grad()
+        
         _, loss = model(input_ids, label_ids)
 
         loss.backward()
-        optimizer.step()
+        optimizer_wrapper.step()
 
         total_loss += loss.item()
-        pbar.set_postfix({"loss": f"{total_loss / (pbar.n + 1):.4f}"})
+        current_lr = optimizer_wrapper._rate
+        pbar.set_postfix({"loss": f"{total_loss / (pbar.n + 1):.4f}", "lr": f"{current_lr:.6f}"})
 
     avg_loss = total_loss / len(dataloader)
     return avg_loss
@@ -88,7 +119,8 @@ def evaluate(model, dataloader):
     avg_loss = total_loss / len(dataloader)
     
     acc = accuracy_score(all_labels, all_preds)
-    f1 = f1_score(all_labels, all_preds, average="macro", zero_division=0)
+    
+    f1 = f1_score(all_labels, all_preds, average="weighted", zero_division=0)
     
     return avg_loss, acc, f1, all_preds, all_labels
 
@@ -133,28 +165,26 @@ def main():
         vocab=vocab
     ).to(config.DEVICE)
 
-    # Cập nhật Optimizer với tham số Betas chuẩn paper
-    optimizer = optim.Adam(
+/    base_optimizer = optim.Adam(
         model.parameters(), 
-        lr=config.LEARNING_RATE, 
+        lr=0,
         betas=config.ADAM_BETAS, 
         eps=config.ADAM_EPS
     )
+    
+    optimizer = NoamOpt(config.D_MODEL, 2, config.WARMUP_STEPS, base_optimizer)
 
     logger.info("Start Training...")
     best_f1 = 0.0
 
     for epoch in range(1, config.EPOCHS + 1):
-        # 1. Train
         train_loss = train(model, train_loader, optimizer, epoch)
         log_msg = f"Epoch {epoch}/{config.EPOCHS} | Train Loss: {train_loss:.4f}"
         
-        # 2. Evaluate
         if dev_loader:
             val_loss, val_acc, val_f1, _, _ = evaluate(model, dev_loader)
             log_msg += f" | Val Loss: {val_loss:.4f} | Acc: {val_acc:.4f} | F1: {val_f1:.4f}"
             
-            # Lưu model tốt nhất
             if val_f1 > best_f1:
                 best_f1 = val_f1
                 torch.save(model.state_dict(), config.SAVE_PATH)
@@ -191,5 +221,4 @@ def main():
         print(report)
 
 if __name__ == "__main__":
-
     main()
