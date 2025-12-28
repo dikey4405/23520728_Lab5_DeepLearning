@@ -22,7 +22,8 @@ class TransformerModel(nn.Module):
         class_weights = vocab.get_class_weights() 
         self.loss_fn = nn.CrossEntropyLoss(
             weight=class_weights, 
-            ignore_index=self.pad_idx
+            ignore_index=self.pad_idx,
+            label_smoothing=0.1
         )
 
         self._init_weights()
@@ -58,3 +59,4 @@ class TransformerModel(nn.Module):
             loss = self.loss_fn(logits, labels)
             
         return logits, loss
+
