@@ -165,7 +165,7 @@ def main():
         vocab=vocab
     ).to(config.DEVICE)
 
-/    base_optimizer = optim.Adam(
+    base_optimizer = optim.Adam(
         model.parameters(), 
         lr=0,
         betas=config.ADAM_BETAS, 
@@ -222,3 +222,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
