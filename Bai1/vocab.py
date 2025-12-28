@@ -3,6 +3,7 @@ import re
 import os
 import torch
 import numpy as np
+from pyvi import ViTokenizer
 from typing import List, Dict, Tuple
 
 class Vocabulary:
@@ -90,6 +91,7 @@ class Vocabulary:
         s = re.sub(r"https?://\S+|www\.\S+", " ", s)
         s = re.sub(r"[^0-9a-zàáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ\s]", " ", s)
         s = re.sub(r"\s+", " ", s).strip()
+        s = ViTokenizer.tokenize(s)
         return s
 
     def tokens_to_ids(self, tokens: List[str]) -> List[int]:
@@ -132,3 +134,4 @@ class Vocabulary:
 
     def decode_labels(self, label_ids: List[int]) -> List[str]:
         return [self.idx2label[i] for i in label_ids]
+
