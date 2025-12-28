@@ -18,7 +18,7 @@ class Config:
     DEV_PATH   = "/kaggle/working/23520728_Lab5_DeepLearning/ViOCD/dev.json"
     TEST_PATH  = "/kaggle/working/23520728_Lab5_DeepLearning/ViOCD/test.json"
     SAVE_PATH  = "/kaggle/working/transformer_base.pth"
-    MIN_FREQ   = 1
+    MIN_FREQ   = 0
 
     D_MODEL = 256       
     N_HEAD = 4         
@@ -222,6 +222,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
