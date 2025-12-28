@@ -169,8 +169,7 @@ def main():
         model.parameters(), 
         lr=0,
         betas=config.ADAM_BETAS, 
-        eps=config.ADAM_EPS,
-        weight_decay = 1e-4
+        eps=config.ADAM_EPS
     )
     
     optimizer = NoamOpt(config.D_MODEL, 2, config.WARMUP_STEPS, base_optimizer)
@@ -223,5 +222,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
