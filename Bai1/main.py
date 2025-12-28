@@ -20,14 +20,14 @@ class Config:
     SAVE_PATH  = "/kaggle/working/transformer_base.pth"
     MIN_FREQ   = 1
 
-    D_MODEL = 512       
-    N_HEAD = 8         
-    N_LAYERS = 6        
-    D_FF = 2048         
-    DROPOUT = 0.1      
+    D_MODEL = 256       
+    N_HEAD = 4         
+    N_LAYERS = 3        
+    D_FF = 1024         
+    DROPOUT = 0.3      
 
-    BATCH_SIZE = 32   
-    EPOCHS = 20
+    BATCH_SIZE = 64   
+    EPOCHS = 30
     
     ADAM_BETAS = (0.9, 0.98) 
     ADAM_EPS = 1e-9          
@@ -169,7 +169,8 @@ def main():
         model.parameters(), 
         lr=0,
         betas=config.ADAM_BETAS, 
-        eps=config.ADAM_EPS
+        eps=config.ADAM_EPS,
+        weight_decay = 1e-4
     )
     
     optimizer = NoamOpt(config.D_MODEL, 2, config.WARMUP_STEPS, base_optimizer)
@@ -222,4 +223,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
