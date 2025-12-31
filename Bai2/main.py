@@ -13,9 +13,9 @@ from module.sequential_labeling import TransformerModel
 class Config:
     DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     
-    TRAIN_PATH = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\PhoNER_COVID19\\train_word.json" 
-    DEV_PATH   = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\PhoNER_COVID19\\dev_word.json"     
-    TEST_PATH  = "D:\\Python\\Nam3\\DL\\ThucHanh\\Lab5\\PhoNER_COVID19\\test_word.json"
+    TRAIN_PATH = "/kaggle/working/23520728_Lab5_DeepLearning/PhoNER_COVID19/train_word.json" 
+    DEV_PATH   = "/kaggle/working/23520728_Lab5_DeepLearning/PhoNER_COVID19/dev_word.json"     
+    TEST_PATH  = "/kaggle/working/23520728_Lab5_DeepLearning/PhoNER_COVID19/test_word.json"
     SAVE_PATH  = "ner_transformer.pth"
     MIN_FREQ   = 1
 
@@ -171,4 +171,5 @@ def main():
         print(classification_report(test_labels, test_preds, labels=unique_labels, target_names=target_names))
 
 if __name__ == "__main__":
+
     main()
