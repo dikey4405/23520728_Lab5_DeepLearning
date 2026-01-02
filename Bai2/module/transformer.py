@@ -16,6 +16,7 @@ class ScaledDotProductAttention(nn.Module):
         self.fc_q = nn.Linear(d_model, head * self.d_q)
         self.fc_k = nn.Linear(d_model, head * self.d_kv)
         self.fc_v = nn.Linear(d_model, head * self.d_kv)
+        self.linear = nn.Linear(d_model, d_model)
 
     def forward(self, queries: torch.Tensor, keys: torch.Tensor, values: torch.Tensor, attention_mask):
         b_s, nq = queries.shape[:2]
@@ -31,8 +32,10 @@ class ScaledDotProductAttention(nn.Module):
             att = att.masked_fill(attention_mask, -1e4)
 
         att = torch.softmax(att, dim=-1)
-        output = torch.matmul(att, v).permute(0, 2, 1, 3).reshape(b_s, nq, -1)
-        return output
+        out = torch.matmul(att, v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.d_model)
+
+        return self.linear(out)
     
 class PositionnalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout, max_len=512):
@@ -160,4 +163,5 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     attn_shape = (seq_len, seq_len)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).bool()
     return subsequent_mask.unsqueeze(0).unsqueeze(0)
+
 
