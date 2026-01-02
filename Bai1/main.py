@@ -22,7 +22,7 @@ class Config:
 
     D_MODEL = 256       
     N_HEAD = 4         
-    N_LAYERS = 2        
+    N_LAYERS = 3        
     D_FF = 1024         
     DROPOUT = 0.2      
 
@@ -222,6 +222,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 
 
