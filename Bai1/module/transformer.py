@@ -5,36 +5,37 @@ import math
 import numpy as np
 
 class ScaledDotProductAttention(nn.Module):
-    def __init__(self, head, d_model, dropout=0.1):
-        super().__init__()
+    def __init__(self, head: int, d_model: int):
+        super(ScaledDotProductAttention, self).__init__()
+
+        self.d_model = d_model
         self.head = head
-        self.d_k = d_model // head
+        self.d_q = d_model // head
+        self.d_kv = d_model // head
 
-        self.fc_q = nn.Linear(d_model, d_model)
-        self.fc_k = nn.Linear(d_model, d_model)
-        self.fc_v = nn.Linear(d_model, d_model)
-        self.fc_o = nn.Linear(d_model, d_model)
+        self.fc_q = nn.Linear(d_model, head * self.d_q)
+        self.fc_k = nn.Linear(d_model, head * self.d_kv)
+        self.fc_v = nn.Linear(d_model, head * self.d_kv)
+        self.linear = nn.Linear(d_model, d_model)
 
-        self.attn_dropout = nn.Dropout(dropout)
+    def forward(self, queries: torch.Tensor, keys: torch.Tensor, values: torch.Tensor, attention_mask):
+        b_s, nq = queries.shape[:2]
+        nk = keys.shape[1]
 
-    def forward(self, q, k, v, mask=None):
-        B, nq, _ = q.size()
-        nk = k.size(1)
+        q = self.fc_q(queries).view(b_s, nq, self.head, self.d_q).permute(0, 2, 1, 3)  # b_s, head, nq, d_q
+        k = self.fc_k(keys).view(b_s, nk, self.head, self.d_kv).permute(0, 2, 3, 1)    # b_s, head, d_kv, nk
+        v = self.fc_v(values).view(b_s, nk, self.head, self.d_kv).permute(0, 2, 1, 3)  # b_s, head, nk, d_kv
 
-        q = self.fc_q(q).view(B, nq, self.head, self.d_k).transpose(1, 2)
-        k = self.fc_k(k).view(B, nk, self.head, self.d_k).transpose(1, 2)
-        v = self.fc_v(v).view(B, nk, self.head, self.d_k).transpose(1, 2)
+        att = torch.matmul(q, k) / math.sqrt(self.d_kv)
+        
+        if attention_mask is not None:
+            att = att.masked_fill(attention_mask, -1e4)
 
-        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.d_k)
+        att = torch.softmax(att, dim=-1)
+        out = torch.matmul(att, v)
+        out = out.permute(0, 2, 1, 3).contiguous().view(b_s, nq, self.d_model)
 
-        if mask is not None:
-            scores = scores.masked_fill(mask, -1e9)
-
-        attn = self.attn_dropout(torch.softmax(scores, dim=-1))
-        out = torch.matmul(attn, v)
-
-        out = out.transpose(1, 2).contiguous().view(B, nq, -1)
-        return self.fc_o(out)
+        return self.linear(out)
     
 class PositionnalEncoding(nn.Module):
     def __init__(self, d_model: int, dropout, max_len=512):
@@ -162,6 +163,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     attn_shape = (seq_len, seq_len)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).bool()
     return subsequent_mask.unsqueeze(0).unsqueeze(0)
+
 
 
 
