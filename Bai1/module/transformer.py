@@ -4,7 +4,7 @@ import torch.nn.functional as F
 import math
 import numpy as np
 
-class MultiHeadAttention(nn.Module):
+class ScaledDotProductAttention(nn.Module):
     def __init__(self, head, d_model, dropout=0.1):
         super().__init__()
         self.head = head
@@ -162,6 +162,7 @@ def generate_sequential_mask(seq_len: int) -> torch.BoolTensor:
     attn_shape = (seq_len, seq_len)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).bool()
     return subsequent_mask.unsqueeze(0).unsqueeze(0)
+
 
 
 
